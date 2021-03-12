@@ -1,0 +1,29 @@
+{
+  "name": "dmw-countdown",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wizo06/dmw-countdown.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wizo06/dmw-countdown/issues"
+  },
+  "homepage": "https://github.com/wizo06/dmw-countdown#readme",
+  "dependencies": {
+    "discord.js": "^12.5.1",
+    "firebase-admin": "^9.5.0",
+    "logger": "github:wizo06/logger",
+    "moment": "^2.29.1",
+    "moment-timezone": "^0.5.33",
+    "table": "^6.0.7",
+    "toml-require": "^1.2.0"
+  }
+}
