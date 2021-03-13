@@ -43,9 +43,6 @@ BOT.on('ready', async () => {
 
   // Clean up #boss channel and send table to the channel
   require(path.join(process.cwd(), 'src/onStartup/displayTable.js')).run(BOT);
-
-  // Load mvp notifications and setTimeout for them
-  // require(path.join(process.cwd(), 'src/onStartup/shiningMoonMVPNotification.js')).run(BOT);
 });
 
 BOT.login(CONFIG.discord.token).catch(e => logger.error(e));
