@@ -63,10 +63,7 @@ const fetchBossDB = (BOT) => {
       const bSecond = b[2].split(':')[2];
       const aETA = moment.duration({ hours: aHour, minutes: aMinute, seconds: aSecond });
       const bETA = moment.duration({ hours: bHour, minutes: bMinute, seconds: bSecond });
-      // console.log(`aETA: ${aETA}`)
-      // console.log(`bETA: ${bETA}`)
       let diff = aETA.subtract(bETA).asMilliseconds();
-      // console.log(diff)
       if (diff < 0) {
         return -1;
       }
@@ -94,53 +91,49 @@ const fetchBossDB = (BOT) => {
   })
 };
 
-const startNotif = async (BOT, sentMessage) => {
+const createTimeout = async (BOT, respawnUNIX, notifID, bossID) => {
+  // gather data to display
+  const doc = await firebase.firestore().collection('bosses').doc(bossID).get();
+  const monsterName = doc.data().monsterName;
+  const cityName = doc.data().cityName;
+  const pictureURL = doc.data().pictureURL;
+  const embed = new discord.MessageEmbed()
+  .setTitle(monsterName)
+  .setAuthor('RESPAWNED!')
+  .setDescription(cityName)
+  .setThumbnail(pictureURL)
+  .setColor('#00FF00')
+  
+  // calculate timeout
+  let millisecondsUntilRespawn = respawnUNIX - moment();
+  BOT.setTimeout(async () => {
+    const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send({ embed });
+    BOT.setTimeout(async () => {
+      await aliveMsg.delete();
+    }, CONFIG.timers.notif_lifespan);
+    // delete notification in db
+    await firebase.firestore().collection('notifications').doc(notifID).delete();
+  }, millisecondsUntilRespawn);
+};
+
+const startNotif = async (BOT) => {
   const snapshotNotif = await firebase.firestore().collection('notifications').get();
   if (!snapshotNotif.empty) {
     const docs = snapshotNotif.docs;
     for (let notifDoc of docs) {
       logger.debug('starting notification with id', notifDoc.id);
       const bossID = notifDoc.data().bossID;
-      const bossDoc = await firebase.firestore().collection('bosses').doc(bossID).get();
-      const respawnDuration = bossDoc.data().respawnTime;
-      const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
-      const minute = respawnDuration.match(/\d+m/i)[0].replace('m', '');
-      const respawnUNIX = moment().add(hour, 'hours').add(minute, 'minutes');
-      // settimeout
-      let millisecondsUntilRespawn = respawnUNIX - moment().valueOf();
-      BOT.setTimeout(async () => {
-        const doc = await firebase.firestore().collection('bosses').doc(bossID).get();
-        const monsterName = doc.data().monsterName;
-        const cityName = doc.data().cityName;
-        const pictureURL = doc.data().pictureURL;
-        const embed = new discord.MessageEmbed()
-          .setTitle(monsterName)
-          .setAuthor('RESPAWNED!')
-          .setDescription(cityName)
-          .setThumbnail(pictureURL)
-          .setColor('#00FF00')
-
-        const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send({ embed });
-        BOT.setTimeout(async () => {
-          await aliveMsg.delete();
-        }, 1000 * 60 * 5);
-        // delete notification
-        await firebase.firestore().collection('notifications').doc(notifDoc.id).delete();
-        // update the discord message
-        // let { output, embed, bossDocs } = await fetchBossDB(BOT);
-        // await sentMessage.edit(`\`\`\`${output}\`\`\``, { embed });
-      }, millisecondsUntilRespawn);
+      const respawnUNIX = notifDoc.data().respawnUNIX;
+      createTimeout(BOT, respawnUNIX, notifDoc.id, bossID);
     }
   }
 };
 
-const refreshTable = async (BOT, sentMessage) => {
-  const oneSecond = 1000;
-  const tenSeconds = oneSecond * 10;
+const redrawTable = async (BOT, sentMessage) => {
   BOT.setInterval(async () => {
     let { output, embed, bossDocs } = await fetchBossDB(BOT);
     await sentMessage.edit(`\`\`\`${output}\`\`\``, { embed });
-  }, tenSeconds);
+  }, CONFIG.timers.redraw_interval);
 };
 
 const run = async BOT => {
@@ -161,10 +154,10 @@ const run = async BOT => {
   const readyMsg = await sentMessage.channel.send('✅ Ready to react');
   BOT.setTimeout(async () => {
     await readyMsg.delete();
-  }, 1000 * 10);
+  }, CONFIG.timers.ready_lifespan);
 
   // REFRESH TABLE EVERY INTERVAL
-  refreshTable(BOT, sentMessage);
+  redrawTable(BOT, sentMessage);
 
   // SETUP LISTENER FOR REACTIONS
   BOT.on('messageReactionAdd', async (messageReaction, user) => {
@@ -190,44 +183,24 @@ const run = async BOT => {
       const snapshotNotif = await firebase.firestore().collection('notifications').where('bossID', '==', id).get();
       // if snapshot is empty, then it means notif for this boss does not exist
       if (snapshotNotif.empty) {
-        logger.debug('notification for boss does not exist. allow the creation of notificaion.');
+        logger.debug('allow the creation of notificaion.');
+        // update lastKilledUNIX in bosses db
+        await firebase.firestore().collection('bosses').doc(id).update({ lastKilledUNIX: moment().valueOf() });
+
+        // create notifications in db
         const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
         const minute = respawnDuration.match(/\d+m/i)[0].replace('m', '');
         const respawnUNIX = moment().add(hour, 'hours').add(minute, 'minutes');
-        const res = await firebase.firestore().collection('notifications').add({ bossID: id, respawnUNIX: respawnUNIX });
-        await firebase.firestore().collection('bosses').doc(id).update({ lastKilledUNIX: moment().valueOf() });
-        
-        // update the discord message
+        const notif = await firebase.firestore().collection('notifications').add({ bossID: id, respawnUNIX: respawnUNIX });
+        // create timeout right away
+        createTimeout(BOT, respawnUNIX, notif.id, id);
+
+        // update table to make it seem responsive
         let { output, embed, bossDocs } = await fetchBossDB(BOT);
         await sentMessage.edit(`\`\`\`${output}\`\`\``, { embed });
-        
-        // settimeout for notification
-        let millisecondsUntilRespawn = respawnUNIX - moment().valueOf();
-        BOT.setTimeout(async () => {
-          const doc = await firebase.firestore().collection('bosses').doc(id).get();
-          const monsterName = doc.data().monsterName;
-          const cityName = doc.data().cityName;
-          const pictureURL = doc.data().pictureURL;
-          const embed = new discord.MessageEmbed()
-            .setTitle(monsterName)
-            .setAuthor('RESPAWNED!')
-            .setDescription(cityName)
-            .setThumbnail(pictureURL)
-            .setColor('#00FF00')
-            
-          const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send({ embed });
-          BOT.setTimeout(async () => {
-            await aliveMsg.delete();
-          }, 1000 * 60 * 5);
-          // delete notification
-          await firebase.firestore().collection('notifications').doc(res.id).delete();
-          // update the discord message
-          // let { output, embed, bossDocs } = await fetchBossDB(BOT);
-          // await sentMessage.edit(`\`\`\`${output}\`\`\``, { embed });
-        }, millisecondsUntilRespawn);
       }
       else {
-        logger.debug('notification already exist. do not create a new notification.');
+        logger.debug('notification already exist.');
       }
     }
   });

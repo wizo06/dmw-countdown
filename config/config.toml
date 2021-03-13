@@ -6,3 +6,9 @@ id = ""
 
 [channels]
 id = ""
+
+# milliseconds
+[timers]
+ready_lifespan = 5000
+redraw_interval = 30000
+notif_lifespan = 300000
