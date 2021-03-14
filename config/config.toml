@@ -1,4 +1,5 @@
 [discord]
+token = ""
 
   [discord.users]
   mst = []
