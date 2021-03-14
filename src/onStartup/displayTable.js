@@ -16,12 +16,12 @@ const listenCommand = (BOT, sentMessage) => {
       let id = comm.split(' ')[1];
       let timestamp = comm.split(' ')[2];
 
-      const snapshot = firebase.firestore().collection('bosses').where('order', '==', id).get();
+      const snapshot = await firebase.firestore().collection('bosses').where('order', '==', parseInt(id)).get();
       if (snapshot.empty) {
         logger.debug('boss does not exist');
         return;
       }
-
+      
       // update lastkilledunix in bosses db
       if (CONFIG.discord.users.mst.includes(msg.author.id)) {
         const canOffset = momentTZ().tz('America/Edmonton').format('Z');
@@ -31,6 +31,7 @@ const listenCommand = (BOT, sentMessage) => {
       else if (CONFIG.discord.users.pty.includes(msg.author.id)) {
         const ptyOffset = momentTZ().tz('America/Panama').format('Z');
         const timestampUNIX = moment(`${timestamp} ${ptyOffset}`, 'hh:mmA Z').valueOf();
+        logger.debug(`update boss ${id} with lastkilledunix ${timestampUNIX}`);
         await firebase.firestore().collection('bosses').doc(snapshot.docs[0].id).update({ lastKilledUNIX: timestampUNIX });
       }
 
