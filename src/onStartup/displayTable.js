@@ -11,7 +11,7 @@ const CONFIG = require(path.join(process.cwd(), 'config/config.toml'));
 
 const fetchBossDB = (BOT) => {
   return new Promise(async (resolve, reject) => {
-    const snapshot = await firebase.firestore().collection('bosses').orderBy('monsterName').get();
+    const snapshot = await firebase.firestore().collection('bosses').orderBy('order').get();
     if (snapshot.empty) {
       await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`Database is empty`);
       logger.error('db is empty');
@@ -19,7 +19,7 @@ const fetchBossDB = (BOT) => {
     }
 
     let desc = [];
-    const arrOfRows = [['Name', 'City', 'ETA (h:m:s)', 'PTY', 'CAN']];
+    const arrOfRows = [['Name', 'City', 'ETA', 'PTY', 'CAN']];
     const docs = snapshot.docs;
     for (let doc of docs) {
       const icon = doc.data().icon;
@@ -27,6 +27,7 @@ const fetchBossDB = (BOT) => {
       const cityName = doc.data().cityName;
       const respawnDuration = doc.data().respawnTime;
       const lastKilledUNIX = doc.data().lastKilledUNIX;
+      const order = doc.data().order;
 
       // Get hour and minute of respawn duration
       const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
@@ -51,7 +52,7 @@ const fetchBossDB = (BOT) => {
       const CANTime = momentTZ.tz(lastKilledUNIX, 'America/Edmonton').format('HH:mm');
       arrOfRows.push([monsterName, cityName, ETA, PTYTime, CANTime]);
 
-      desc.push(`${icon} ${monsterName} ${cityName}`);
+      desc.push(`${icon} ${order}. ${monsterName} ${cityName}`);
     }
 
     const sortedArr = arrOfRows.sort((a, b) => {
@@ -80,7 +81,24 @@ const fetchBossDB = (BOT) => {
         row[2] = 'ALIVE';
     }
 
-    const output = table(sortedArr, { singleLine: true });
+    let tableConfig = {
+      singleLine: true,
+      columns: {
+        2: {
+          alignment: 'center',
+          width: 10
+        },
+        3: {
+          alignment: 'center',
+          width: 10
+        },
+        4: {
+          alignment: 'center',
+          width: 10
+        }
+      }
+    };
+    const output = table(sortedArr, tableConfig);
 
     const embed = new discord.MessageEmbed()
       .setTitle('React to start countdown')
@@ -206,4 +224,4 @@ const run = async BOT => {
   });
 };
 
-module.exports = { run };
+module.exports = { run, fetchBossDB };

@@ -1,5 +1,8 @@
 [discord]
-token = ""
+
+  [discord.users]
+  mst = []
+  pty = []
 
 [guilds]
 id = ""
