@@ -117,13 +117,14 @@ const createTimeout = async (BOT, respawnUNIX, notifID, bossID) => {
   const pictureURL = doc.data().pictureURL;
   const embed = new discord.MessageEmbed()
   .setTitle(monsterName)
-  .setAuthor('RESPAWNED!')
+  .setAuthor('RESPAWN IN 2 MINUTES!')
   .setDescription(cityName)
   .setThumbnail(pictureURL)
   .setColor('#00FF00')
+  .setTimestamp()
   
   // calculate timeout
-  let millisecondsUntilRespawn = respawnUNIX - moment();
+  let millisecondsUntilRespawn = respawnUNIX - moment().add(2, 'minutes').valueOf();
   BOT.setTimeout(async () => {
     const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send({ embed });
     BOT.setTimeout(async () => {
