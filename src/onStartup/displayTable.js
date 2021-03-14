@@ -9,6 +9,38 @@ const momentTZ = require('moment-timezone');
 // Import config
 const CONFIG = require(path.join(process.cwd(), 'config/config.toml'));
 
+const listenCommand = (BOT, sentMessage) => {
+  BOT.on('message', async msg => {
+    if (msg.content.startsWith('Set') || msg.content.startsWith('set')) {
+      let comm = msg.content.trim();
+      let id = comm.split(' ')[1];
+      let timestamp = comm.split(' ')[2];
+
+      const snapshot = firebase.firestore().collection('bosses').where('order', '==', id).get();
+      if (snapshot.empty) {
+        logger.debug('boss does not exist');
+        return;
+      }
+
+      // update lastkilledunix in bosses db
+      if (CONFIG.discord.users.mst.includes(msg.author.id)) {
+        const canOffset = momentTZ().tz('America/Edmonton').format('Z');
+        const timestampUNIX = moment(`${timestamp} ${canOffset}`, 'hh:mmA Z').valueOf();
+        await firebase.firestore().collection('bosses').doc(snapshot.docs[0].id).update({ lastKilledUNIX: timestampUNIX });
+      }
+      else if (CONFIG.discord.users.pty.includes(msg.author.id)) {
+        const ptyOffset = momentTZ().tz('America/Panama').format('Z');
+        const timestampUNIX = moment(`${timestamp} ${ptyOffset}`, 'hh:mmA Z').valueOf();
+        await firebase.firestore().collection('bosses').doc(snapshot.docs[0].id).update({ lastKilledUNIX: timestampUNIX });
+      }
+
+      // update table to make it seem responsive
+      let { output, embed, bossDocs } = await fetchBossDB(BOT);
+      await sentMessage.edit(`\`\`\`${output}\`\`\``, { embed });
+    }
+  });
+};
+
 const fetchBossDB = (BOT) => {
   return new Promise(async (resolve, reject) => {
     const snapshot = await firebase.firestore().collection('bosses').orderBy('order').get();
@@ -102,7 +134,7 @@ const fetchBossDB = (BOT) => {
 
     const embed = new discord.MessageEmbed()
       .setTitle('React to start countdown')
-      .setAuthor('WAIT FOR READY MESSAGE BEFORE REACTING')
+      // .setAuthor('WAIT FOR READY MESSAGE BEFORE REACTING')
       .setDescription(desc.join('\n'))
 
     resolve({ output, embed, bossDocs: docs });
@@ -124,12 +156,16 @@ const createTimeout = async (BOT, respawnUNIX, notifID, bossID) => {
   .setTimestamp()
   
   // calculate timeout
-  let millisecondsUntilRespawn = respawnUNIX - moment().add(2, 'minutes').valueOf();
+  let notifTimeout = respawnUNIX - moment().add(2, 'minutes').valueOf();
+  let millisecondsUntilRespawn = respawnUNIX - moment().valueOf();
   BOT.setTimeout(async () => {
     const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send({ embed });
     BOT.setTimeout(async () => {
       await aliveMsg.delete();
     }, CONFIG.timers.notif_lifespan);
+  }, notifTimeout);
+  
+  BOT.setTimeout(async () => {
     // delete notification in db
     await firebase.firestore().collection('notifications').doc(notifID).delete();
   }, millisecondsUntilRespawn);
@@ -175,6 +211,9 @@ const run = async BOT => {
     await readyMsg.delete();
   }, CONFIG.timers.ready_lifespan);
 
+  // listen for commands
+  listenCommand(BOT, sentMessage);
+
   // REFRESH TABLE EVERY INTERVAL
   redrawTable(BOT, sentMessage);
 
@@ -209,7 +248,7 @@ const run = async BOT => {
         // create notifications in db
         const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
         const minute = respawnDuration.match(/\d+m/i)[0].replace('m', '');
-        const respawnUNIX = moment().add(hour, 'hours').add(minute, 'minutes');
+        const respawnUNIX = moment().add(hour, 'hours').add(minute, 'minutes').valueOf();
         const notif = await firebase.firestore().collection('notifications').add({ bossID: id, respawnUNIX: respawnUNIX });
         // create timeout right away
         createTimeout(BOT, respawnUNIX, notif.id, id);
@@ -225,4 +264,4 @@ const run = async BOT => {
   });
 };
 
-module.exports = { run, fetchBossDB };
+module.exports = { run };
