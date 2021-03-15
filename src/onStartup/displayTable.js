@@ -267,17 +267,18 @@ const listenMessage = (BOT, sentMessage) => {
       const bossDocID = snapshot.docs[0].id;
       const monsterName = snapshot.docs[0].data().monsterName;
       let timestampUNIX = undefined;
+      let date = undefined;
       // update lastkilledunix in bosses db
       if (CONFIG.discord.users.mst.includes(msg.author.id)) {
-        const canDate = momentTZ().tz('America/Edmonton').format('YYYY.MM.DD');
+        date = momentTZ().tz('America/Edmonton').format('YYYY.MM.DD');
         const canOffset = momentTZ().tz('America/Edmonton').format('Z');
-        timestampUNIX = moment(`${canDate} ${userInputTimestamp} ${canOffset}`, 'YYYY.MM.DD HH:mm Z').valueOf();
+        timestampUNIX = moment(`${date} ${userInputTimestamp} ${canOffset}`, 'YYYY.MM.DD HH:mm Z').valueOf();
         await updateLastKilledUNIX(timestampUNIX, bossDocID);
       }
       else if (CONFIG.discord.users.pty.includes(msg.author.id)) {
-        const ptyDate = momentTZ().tz('America/Panama').format('YYYY.MM.DD');
+        date = momentTZ().tz('America/Panama').format('YYYY.MM.DD');
         const ptyOffset = momentTZ().tz('America/Panama').format('Z');
-        timestampUNIX = moment(`${ptyDate} ${userInputTimestamp} ${ptyOffset}`, 'YYYY.MM.DD hh:mmA Z').valueOf();
+        timestampUNIX = moment(`${date} ${userInputTimestamp} ${ptyOffset}`, 'YYYY.MM.DD hh:mmA Z').valueOf();
         await updateLastKilledUNIX(timestampUNIX, bossDocID);
       }
       else {
@@ -287,7 +288,7 @@ const listenMessage = (BOT, sentMessage) => {
       
       // Send confirmation message
       logger.debug(`LK of ${monsterName} changed to ${moment(timestampUNIX).format('MM.DD HH:mm')}`);
-      const confirmMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`✅ LK of \`${monsterName}\` has been changed to \`${userInputTimestamp}\``);
+      const confirmMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`✅ LK of \`${monsterName}\` has been changed to \`${date} ${userInputTimestamp}\``);
       setTimeout(async () => {
         await confirmMsg.delete();
       }, CONFIG.timers.reply_msg_lifespan);
