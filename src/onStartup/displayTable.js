@@ -369,7 +369,7 @@ const run = async BOT => {
   logger.debug('Starting setInterval for table');
   setInterval(async () => {
     await editMessage(sentMessage);
-    logger.debug(`arr len: ${arrOfTimeoutObjs.length}`);
+    // logger.debug(`arr len: ${arrOfTimeoutObjs.length}`);
   }, CONFIG.timers.redraw_interval);
 
   // LISTEN TO REACTIONS
