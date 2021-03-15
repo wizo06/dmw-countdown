@@ -3,7 +3,9 @@ token = ""
 
   [discord.users]
   mst = []
-  pty = []
+
+  [discord.role]
+  digimon = ""
 
 [guilds]
 id = ""
@@ -13,6 +15,6 @@ id = ""
 
 # milliseconds
 [timers]
-ready_lifespan = 5000
-redraw_interval = 30000
+reply_msg_lifespan = 10000
+redraw_interval = 5000
 notif_lifespan = 300000
