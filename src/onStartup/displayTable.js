@@ -148,7 +148,7 @@ const createTimeout = async (BOT, timeoutDuration, bossDocID) => {
   const order = doc.data().order;
   const embed = new discord.MessageEmbed()
     .setTitle(monsterName)
-    .setAuthor('RESPAWN IN 2 MINUTES!')
+    .setAuthor('RESPAWNS IN LESS THAN 2 MINUTES!')
     .setDescription(cityName)
     .setThumbnail(pictureURL)
     .setColor('#00FF00')
@@ -159,12 +159,22 @@ const createTimeout = async (BOT, timeoutDuration, bossDocID) => {
   const timeoutObj = setTimeout(async () => {
     logger.debug(`Sending notification for ${monsterName} ${cityName}`);
     const aliveMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(msg, { embed });
+    // remvoe from array
+    const found = arrOfTimeoutObjs.find(ele => ele.bossOrder == order);
+    const foundIndex = arrOfTimeoutObjs.findIndex(ele => ele.bossOrder == order);
+    if (found) {
+      logger.debug(`Timeout object for ${monsterName} found. Clearing it and removing from array`);
+      clearTimeout(found.timeoutObj);
+      arrOfTimeoutObjs.splice(foundIndex, 1);
+    }
+    // auto delete alive msg
     setTimeout(async () => {
       await aliveMsg.delete();
     }, CONFIG.timers.notif_lifespan);
   }, timeoutDuration);
 
   arrOfTimeoutObjs.push({ timeoutObj, bossOrder: order });
+  logger.debug(`Timeout of ${moment.duration(timeoutDuration).asSeconds()}s for ${monsterName} created. Length of arrOfTimeoutObjs: ${arrOfTimeoutObjs.length}`);
 };
 
 const listenReaction = async (BOT, sentMessage) => {
@@ -210,7 +220,7 @@ const listenReaction = async (BOT, sentMessage) => {
         setTimeout(async () => {
           await errMsg.delete();
         }, CONFIG.timers.reply_msg_lifespan);
-        logger.warning('Countdown for boss has already started');
+        logger.warning(`Countdown for ${monsterName} has already started`);
         return;
       }
 
@@ -224,7 +234,7 @@ const listenReaction = async (BOT, sentMessage) => {
       await updateLastKilledUNIX(moment().valueOf(), bossDocID);
 
       // create timeout
-      const newRespawnMomentObj = moment().add(hour, 'hours').add(minute, 'minutes').add(2, 'minutes');
+      const newRespawnMomentObj = moment().add(hour, 'hours').add(minute, 'minutes').subtract(2, 'minutes');
       const newDiff = newRespawnMomentObj.diff(moment());
       const timeoutDuration = moment.duration(newDiff).asMilliseconds();
       createTimeout(BOT, timeoutDuration, bossDocID);
@@ -259,23 +269,24 @@ const listenMessage = (BOT, sentMessage) => {
       let timestampUNIX = undefined;
       // update lastkilledunix in bosses db
       if (CONFIG.discord.users.mst.includes(msg.author.id)) {
+        const canDate = momentTZ().tz('America/Edmonton').format('YYYY.MM.DD');
         const canOffset = momentTZ().tz('America/Edmonton').format('Z');
-        timestampUNIX = moment(`${userInputTimestamp} ${canOffset}`, 'HH:mm Z').valueOf();
-        logger.debug(`update boss ${order} with lastkilledunix ${timestampUNIX}`);
+        timestampUNIX = moment(`${canDate} ${userInputTimestamp} ${canOffset}`, 'YYYY.MM.DD HH:mm Z').valueOf();
         await updateLastKilledUNIX(timestampUNIX, bossDocID);
       }
       else if (CONFIG.discord.users.pty.includes(msg.author.id)) {
+        const ptyDate = momentTZ().tz('America/Panama').format('YYYY.MM.DD');
         const ptyOffset = momentTZ().tz('America/Panama').format('Z');
-        timestampUNIX = moment(`${userInputTimestamp} ${ptyOffset}`, 'hh:mmA Z').valueOf();
-        logger.debug(`update boss ${order} with lastkilledunix ${timestampUNIX}`);
+        timestampUNIX = moment(`${ptyDate} ${userInputTimestamp} ${ptyOffset}`, 'YYYY.MM.DD hh:mmA Z').valueOf();
         await updateLastKilledUNIX(timestampUNIX, bossDocID);
       }
       else {
         // ignore unauthorized users
         return;
       }
-
+      
       // Send confirmation message
+      logger.debug(`LK of ${monsterName} changed to ${moment(timestampUNIX).format('MM.DD HH:mm')}`);
       const confirmMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`✅ LK of \`${monsterName}\` has been changed to \`${userInputTimestamp}\``);
       setTimeout(async () => {
         await confirmMsg.delete();
@@ -286,6 +297,7 @@ const listenMessage = (BOT, sentMessage) => {
       const found = arrOfTimeoutObjs.find(ele => ele.bossOrder == order);
       const foundIndex = arrOfTimeoutObjs.findIndex(ele => ele.bossOrder == order);
       if (found) {
+        logger.debug(`Timeout object for ${monsterName} found. Clearing it and removing from array`);
         clearTimeout(found.timeoutObj);
         arrOfTimeoutObjs.splice(foundIndex, 1);
       }
@@ -293,7 +305,7 @@ const listenMessage = (BOT, sentMessage) => {
       const respawnDuration = snapshot.docs[0].data().respawnDuration;
       const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
       const minute = respawnDuration.match(/\d+m/i)[0].replace('m', '');
-      const respawnMomentObj = moment(timestampUNIX).add(hour, 'hours').add(minute, 'minutes').add(2, 'minutes');
+      const respawnMomentObj = moment(timestampUNIX).add(hour, 'hours').add(minute, 'minutes').subtract(2, 'minutes');
       const diff = respawnMomentObj.diff(moment());
       const timeoutDuration = moment.duration(diff).asMilliseconds();
       createTimeout(BOT, timeoutDuration, bossDocID);
@@ -313,7 +325,7 @@ const startNotif = async (BOT) => {
       const lastKilledUNIX = doc.data().lastKilledUNIX;
       const hour = respawnDuration.match(/\d+h/i)[0].replace('h', '');
       const minute = respawnDuration.match(/\d+m/i)[0].replace('m', '');
-      const respawnMomentObj = moment(lastKilledUNIX).add(hour, 'hours').add(minute, 'minutes');
+      const respawnMomentObj = moment(lastKilledUNIX).add(hour, 'hours').add(minute, 'minutes').subtract(2, 'minutes');
       const diff = respawnMomentObj.diff(moment());
       const diffInMS = moment.duration(diff).asMilliseconds();
       // diffInMS < 0 means boss is ALIVE
@@ -357,6 +369,7 @@ const run = async BOT => {
   logger.debug('Starting setInterval for table');
   setInterval(async () => {
     await editMessage(sentMessage);
+    logger.debug(`arr len: ${arrOfTimeoutObjs.length}`);
   }, CONFIG.timers.redraw_interval);
 
   // LISTEN TO REACTIONS
