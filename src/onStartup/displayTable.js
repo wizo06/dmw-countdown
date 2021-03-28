@@ -112,7 +112,10 @@ const sendReadyMessage = (BOT) => {
   return new Promise(async (resolve, reject) => {
     const readyMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send('✅ Ready to react');
     setTimeout(async () => {
-      await readyMsg.delete();
+      try {
+        await readyMsg.delete();
+      }  
+      catch (e) { }
       resolve();
     }, CONFIG.timers.reply_msg_lifespan);
   });
@@ -169,7 +172,10 @@ const createTimeout = async (BOT, timeoutDuration, bossDocID) => {
     }
     // auto delete alive msg
     setTimeout(async () => {
-      await aliveMsg.delete();
+      try {
+        await aliveMsg.delete();
+      }
+      catch (e) { }
     }, CONFIG.timers.notif_lifespan);
   }, timeoutDuration);
 
@@ -201,7 +207,10 @@ const listenReaction = async (BOT, sentMessage) => {
       if (bossDocID === undefined) {
         const errMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send('❌ Invalid reaction');
         setTimeout(async () => {
-          await errMsg.delete();
+          try {
+            await errMsg.delete();
+          }
+          catch (e) { }
         }, CONFIG.timers.reply_msg_lifespan);
         logger.warning('Invalid reaction');
         return;
@@ -218,7 +227,10 @@ const listenReaction = async (BOT, sentMessage) => {
       if (diffInMS > 0) {
         const errMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`❌ Countdown for \`${monsterName}\` has already started. Cannot reset countdown.`);
         setTimeout(async () => {
-          await errMsg.delete();
+          try {
+            await errMsg.delete();
+          }
+          catch (e) { }
         }, CONFIG.timers.reply_msg_lifespan);
         logger.warning(`Countdown for ${monsterName} has already started`);
         return;
@@ -227,7 +239,10 @@ const listenReaction = async (BOT, sentMessage) => {
       // Send confirmation message
       const confirmMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`✅ Countdown started for \`${monsterName}\``);
       setTimeout(async () => {
-        await confirmMsg.delete();
+        try {
+          await confirmMsg.delete();
+        }
+        catch (e) { }
       }, CONFIG.timers.reply_msg_lifespan);
 
       // update lastKilledUNIX in bosses db
@@ -258,7 +273,10 @@ const listenMessage = (BOT, sentMessage) => {
       if (snapshot.empty) {
         const errMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send('❌ Invalid boss ID');
         setTimeout(async () => {
-          await errMsg.delete();
+          try {
+            await errMsg.delete();
+          }
+          catch (e) { }
         }, CONFIG.timers.reply_msg_lifespan);
         logger.debug(`Invalid boss ID (order): ${order}`);
         return;
@@ -290,7 +308,10 @@ const listenMessage = (BOT, sentMessage) => {
       logger.debug(`LK of ${monsterName} changed to ${moment(timestampUNIX).format('MM.DD HH:mm')}`);
       const confirmMsg = await BOT.guilds.cache.get(CONFIG.guilds.id).channels.cache.get(CONFIG.channels.id).send(`✅ LK of \`${monsterName}\` has been changed to \`${date} ${userInputTimestamp}\``);
       setTimeout(async () => {
-        await confirmMsg.delete();
+        try {
+          await confirmMsg.delete();
+        }
+        catch (e) { }
       }, CONFIG.timers.reply_msg_lifespan);
 
       // clear timeout if already exists
@@ -343,8 +364,11 @@ const autoCleanMsgs = async (BOT) => {
   BOT.on('message', async (msg) => {
     if (msg.channel.id === CONFIG.channels.id &&
         msg.author.bot === false) {
-      setTimeout(() => {
-        msg.delete();
+      setTimeout(async () => {
+        try {
+          await msg.delete();
+        }
+        catch (e) { }
       }, CONFIG.timers.reply_msg_lifespan);
     }
   });
